@@ -40,6 +40,23 @@ def collect_cwe_descriptions(html_text):
         if cwe_id not in CWE_DESCRIPTIONS:
             CWE_DESCRIPTIONS[cwe_id] = desc
 
+def parse_rounds_enabled(html_text):
+    """Extract the list of competition rounds a CB was enabled in.
+
+    The Rounds Enabled <h4> block in the LL archive HTML contains a
+    comma-separated sequence of <a href="/cgc/cgc-corpus/round/N/">N</a>
+    links. The window is contiguous in every CFE binary we have seen
+    (typically 15 rounds wide), so the list and (last-first+1) agree;
+    we return the explicit list to preserve the raw record.
+    """
+    m = re.search(r'<h4>\s*Rounds Enabled\s*</h4>(.*?)<h4',
+                  html_text, re.DOTALL)
+    if not m:
+        return []
+    block = m.group(1)
+    return sorted({int(rm.group(1))
+                   for rm in re.finditer(r'/round/(\d+)/', block)})
+
 def parse_corpus_cwes(cb_name):
     """Read CWE IDs from a CB's cgccorpus README, in order, deduped.
 
@@ -73,11 +90,13 @@ def parse_cb(cb_name):
 
     collect_cwe_descriptions(html)
     cwes = parse_corpus_cwes(cb_name)
+    rounds_enabled = parse_rounds_enabled(html)
 
     result = {
         "cb": cb_name,
         "primary_cwe": cwes[0] if cwes else None,
         "cwes": cwes,
+        "rounds_enabled": rounds_enabled,
         "patches": {},
         "original_exploited": False,
         "pov_details": [],
@@ -186,6 +205,59 @@ print("Exploited CBs:")
 for r in exploited:
     teams = sorted(set(p["source"] for p in r["pov_details"]))
     print(f"  {r['cb']} -- by {', '.join(teams)}")
+
+# Timing analysis: how soon after enablement was each exploited CB
+# cracked, both in absolute rounds and as a fraction of its enabled
+# window? Backs Sec. 4 claims: "Half of the exploited binaries were
+# cracked within five rounds of deployment; the rest [...] within
+# the first third of their enabled window."
+def timing_for(r):
+    if not r["pov_details"] or not r["rounds_enabled"]:
+        return None
+    first_enabled = min(r["rounds_enabled"])
+    first_pov = min(p["round"] for p in r["pov_details"])
+    window = len(r["rounds_enabled"])
+    rounds_in = first_pov - first_enabled  # 0-indexed: 0 = same round as deploy
+    return {
+        "cb": r["cb"],
+        "first_enabled": first_enabled,
+        "first_pov": first_pov,
+        "window": window,
+        "rounds_in": rounds_in,
+        "frac_in": rounds_in / window if window else None,
+    }
+
+timings = [t for t in (timing_for(r) for r in exploited) if t]
+timings.sort(key=lambda t: t["rounds_in"])
+
+print("\nTiming for exploited CBs (rounds_in = first POV round - first enabled round):")
+print(f"  {'CB':<14} {'enabled':>8} {'first_pov':>10} {'window':>7} {'rounds_in':>10} {'frac_in':>8}")
+for t in timings:
+    print(f"  {t['cb']:<14} {t['first_enabled']:>8} {t['first_pov']:>10} "
+          f"{t['window']:>7} {t['rounds_in']:>10} {t['frac_in']:>8.2f}")
+
+if timings:
+    in5 = [t for t in timings if t["rounds_in"] <= 5]
+    in_third = [t for t in timings if t["frac_in"] <= 1/3]
+    print(f"\n  exploited within 5 rounds of deployment: {len(in5)}/{len(timings)}"
+          f" ({100*len(in5)/len(timings):.1f}%)")
+    print(f"  exploited within first third of enabled window: "
+          f"{len(in_third)}/{len(timings)} "
+          f"({100*len(in_third)/len(timings):.1f}%)")
+    rounds_in_list = [t["rounds_in"] for t in timings]
+    sorted_ri = sorted(rounds_in_list)
+    n = len(sorted_ri)
+    median = (sorted_ri[n//2] if n % 2 else (sorted_ri[n//2 - 1] + sorted_ri[n//2]) / 2)
+    print(f"  median rounds_in among exploited: {median}")
+    print(f"  max rounds_in among exploited: {max(rounds_in_list)}")
+
+ne_with_window = [r for r in not_exploited if r["rounds_enabled"]]
+if ne_with_window:
+    windows = [len(r["rounds_enabled"]) for r in ne_with_window]
+    print(f"\nNon-exploited CBs: {len(ne_with_window)} had enabled windows "
+          f"(min/median/max window = {min(windows)}/"
+          f"{sorted(windows)[len(windows)//2]}/{max(windows)} rounds); "
+          f"none were exploited regardless of window length.")
 
 # CWE distribution across all CBs and across the exploited subset.
 # "primary" counts each CB once, by its first-listed CWE (the methodology

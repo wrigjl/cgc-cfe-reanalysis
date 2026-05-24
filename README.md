@@ -37,16 +37,17 @@ Paper claims fully reproduced by `cfe-parse-results.json`:
   where `original_exploited` is `true` is concentrated in CWE-121,
   CWE-122, CWE-119, CWE-120, CWE-131, CWE-193, CWE-125, CWE-126,
   CWE-135, CWE-788, and CWE-190 (17 of 20 exploited CBs).
-
-Partially reproduced (raw inputs here, additional analysis required):
-
-- Section 4 timing claims ("Half of the exploited binaries were
-  cracked within five rounds of deployment; the rest [...] within
-  the first third of their enabled window") --- round of first
-  successful POV per CB is in `pov_details[*].round`, but the
-  "rounds of deployment" and "enabled window" framings require
-  joining against each CB's enablement timeline. That step is not
-  yet automated here.
+- Section 4 timing framings --- each CB's enabled-window
+  (`rounds_enabled`) is now extracted from the LL archive HTML and
+  the script computes `rounds_in = first_pov_round -
+  first_enabled_round` and `frac_in = rounds_in / window` per
+  exploited CB. The summary tallies how many exploited CBs were
+  cracked within five rounds of deployment and within the first
+  third of their enabled window, and confirms that the 62
+  non-exploited CBs were never exploited regardless of window
+  length. The reproduced numbers do not exactly match the paper's
+  current "half within five rounds, rest within first third"
+  phrasing; see the paper-repo TODO for the audit item.
 
 ## Reproduce
 
@@ -92,10 +93,11 @@ lives elsewhere.
   "cb": "CROMU_00046",
   "primary_cwe": "CWE-119",
   "cwes": ["CWE-119"],
+  "rounds_enabled": [52, 53, 54, ..., 66],
   "patches": { "<team>": <first_patch_round>, ... },
   "original_exploited": true,
   "pov_details": [
-    { "round": 12, "source": "<attacker>", "dest": "<defender>" },
+    { "round": 58, "source": "<attacker>", "dest": "<defender>" },
     ...
   ]
 }
@@ -106,6 +108,10 @@ lives elsewhere.
   CWE-distribution claims).
 - `cwes` is the full ordered, deduplicated list of CWE IDs that appear
   in the CB's cgccorpus README; the typical CB lists ~2.
+- `rounds_enabled` is the sorted list of competition rounds during
+  which this CB was active. Windows are contiguous in every CFE
+  binary observed and run 15--25 rounds; `min(rounds_enabled)` is
+  the deployment round.
 - Only POVs that landed *before* the defender's first patch in
   `patches` are included in `pov_details`; later POVs against patched
   binaries are excluded so that `original_exploited` reflects
