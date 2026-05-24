@@ -7,11 +7,16 @@ Reasoning" (IEEE Security & Privacy magazine, 2026 submission).
 
 ## What this reproduces
 
-The scripts here download per-CB HTML pages from the MIT Lincoln
-Laboratory CFE archive, extract deployed patches and successful
-proof-of-vulnerability (POV) outcomes per round, and join the two to
-flag binaries whose *original* shipped version was exploited before
-the defender's first patch.
+The scripts here pull two sources together:
+
+1. The MIT Lincoln Laboratory CFE archive HTML, for per-round deployed
+   patches and successful proof-of-vulnerability (POV) outcomes.
+2. The `cgc-challenge-corpus` per-CB README files, for each CB's CWE
+   classification.
+
+These are joined so that for every CB we know whether its *original*
+shipped version was exploited (before the defender's first patch),
+which teams exploited it, and its primary CWE classification.
 
 Paper claims fully reproduced by `cfe-parse-results.json`:
 
@@ -21,6 +26,17 @@ Paper claims fully reproduced by `cfe-parse-results.json`:
 - Section 4: "the most prolific attacker exploited 15 of 82 original
   binaries, while one finalist exploited none at all." --- aggregate
   of `pov_details[*].source` per CB.
+- Section 2.4: "the 82 challenge sets [...] spanned 29 distinct CWE
+  vulnerability categories" --- count of distinct values of
+  `primary_cwe` across the corpus.
+- Section 2.4: "stack-based buffer overflows (CWE-121) alone accounted
+  for roughly a fifth of the challenges" --- 19 of 82 CBs (23.2%) have
+  `primary_cwe == "CWE-121"`.
+- Section 4: "the 20 exploited binaries were dominated by classic
+  memory corruption" --- the distribution of `primary_cwe` across CBs
+  where `original_exploited` is `true` is concentrated in CWE-121,
+  CWE-122, CWE-119, CWE-120, CWE-131, CWE-193, CWE-125, CWE-126,
+  CWE-135, CWE-788, and CWE-190 (17 of 20 exploited CBs).
 
 Partially reproduced (raw inputs here, additional analysis required):
 
@@ -30,13 +46,6 @@ Partially reproduced (raw inputs here, additional analysis required):
   successful POV per CB is in `pov_details[*].round`, but the
   "rounds of deployment" and "enabled window" framings require
   joining against each CB's enablement timeline. That step is not
-  yet automated here.
-- Sections 2.4 and 4 CWE-distribution claims ("stack-based buffer
-  overflows alone accounted for roughly a fifth of the challenges";
-  "the 20 exploited binaries were dominated by classic memory
-  corruption") --- require cross-referencing CB names against each
-  CB's CWE classification from the cgccorpus README files at
-  <https://github.com/CyberGrandChallenge/>. That join is also not
   yet automated here.
 
 ## Reproduce
@@ -49,11 +58,19 @@ python3 parse_cfe.py    # prints summary, writes cfe-parse-results.json
 The fetch is idempotent: `fetch_cfe.sh` only downloads pages it does
 not already have in `cfe-raw/`.
 
+`parse_cfe.py` also reads `../cgc-challenge-corpus/<CB>/README.md` for
+CWE classifications. Override the corpus path with
+`CGC_CORPUS_DIR=/path/to/corpus python3 parse_cfe.py` if the corpus
+lives elsewhere.
+
 ## Dependencies
 
 - POSIX shell with `curl` (for `fetch_cfe.sh`)
 - Python 3.6+ standard library (for `parse_cfe.py`; no third-party
   packages required)
+- A local checkout of `cgc-challenge-corpus` from
+  <https://github.com/CyberGrandChallenge/>, expected at
+  `../cgc-challenge-corpus` by default
 - Roughly 5 MB of disk for the raw HTML cache
 
 ## Files
@@ -62,7 +79,7 @@ not already have in `cfe-raw/`.
 |---|---|
 | `cfe-cbs.txt` | 82 CFE final-event challenge binary names, one per line |
 | `fetch_cfe.sh` | Downloads each CB's HTML page from `archive.ll.mit.edu/cgc/cgc-corpus/challenges/<CB>/` |
-| `parse_cfe.py` | Parses HTML, extracts patches and POVs, writes JSON |
+| `parse_cfe.py` | Parses HTML and corpus READMEs, writes JSON |
 | `cfe-raw/` | (generated) per-CB HTML pages from the LL archive |
 | `cfe-parse-results.json` | (generated) structured per-CB results |
 
@@ -73,6 +90,8 @@ not already have in `cfe-raw/`.
 ```
 {
   "cb": "CROMU_00046",
+  "primary_cwe": "CWE-119",
+  "cwes": ["CWE-119"],
   "patches": { "<team>": <first_patch_round>, ... },
   "original_exploited": true,
   "pov_details": [
@@ -82,18 +101,22 @@ not already have in `cfe-raw/`.
 }
 ```
 
-Only POVs that landed *before* the defender's first patch in `patches`
-are included in `pov_details`; later POVs against patched binaries are
-excluded so that `original_exploited` reflects exploitability of the
-shipped binary rather than of any later replacement.
+- `primary_cwe` is the first CWE listed in the CB's cgccorpus README
+  (the methodology that matches the paper's Section 2.4 / Section 4
+  CWE-distribution claims).
+- `cwes` is the full ordered, deduplicated list of CWE IDs that appear
+  in the CB's cgccorpus README; the typical CB lists ~2.
+- Only POVs that landed *before* the defender's first patch in
+  `patches` are included in `pov_details`; later POVs against patched
+  binaries are excluded so that `original_exploited` reflects
+  exploitability of the shipped binary rather than of any later
+  replacement.
 
 ## Source data and stability
 
 The CFE archive is hosted by MIT Lincoln Laboratory at
 <https://archive.ll.mit.edu/cgc/>. The original competition binaries
-and scoring data are also mirrored at
-<https://github.com/CyberGrandChallenge/>. `parse_cfe.py` parses the
-LL archive's rendered HTML; if MIT LL changes the page layout, the
-regex extraction in `parse_cfe.py` will need updating. The GitHub
-mirror is more stable for raw artifacts but does not include the
-rendered per-round scoring view this script depends on.
+and scoring data, including per-CB README files with CWE classifications,
+are mirrored at <https://github.com/CyberGrandChallenge/>. If MIT LL
+changes the archive HTML layout, the regex extraction in `parse_cfe.py`
+will need updating; the cgccorpus mirror is more stable.
