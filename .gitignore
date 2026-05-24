@@ -1,0 +1,4 @@
+cfe-raw/
+cfe-parse-results.json
+__pycache__/
+*.pyc
