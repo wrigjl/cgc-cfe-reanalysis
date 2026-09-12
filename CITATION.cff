@@ -6,6 +6,7 @@ authors:
     given-names: Jason L.
     affiliation: Idaho State University
 repository-code: "https://github.com/wrigjl/cgc-cfe-reanalysis"
+license: BSD-2-Clause
 abstract: >-
   Scripts and per-challenge-binary results reanalyzing the DARPA Cyber
   Grand Challenge Final Event (CFE) archive: per-round exploitation
