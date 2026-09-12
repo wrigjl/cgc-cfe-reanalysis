@@ -1,0 +1,21 @@
+cff-version: 1.2.0
+message: "If you use this reanalysis, please cite it as below."
+title: "cgc-cfe-reanalysis: Reanalysis of the DARPA Cyber Grand Challenge Final Event archive"
+authors:
+  - family-names: Wright
+    given-names: Jason L.
+    affiliation: Idaho State University
+repository-code: "https://github.com/wrigjl/cgc-cfe-reanalysis"
+abstract: >-
+  Scripts and per-challenge-binary results reanalyzing the DARPA Cyber
+  Grand Challenge Final Event (CFE) archive: per-round exploitation
+  outcomes cross-referenced against each challenge binary's CWE
+  classification, with enabled-window timing analysis. Supports the
+  empirical claims in Wright, "The Cognition Gap: What the Cyber Grand
+  Challenge Revealed About Autonomous Cyber Reasoning" (IEEE Security &
+  Privacy magazine).
+keywords:
+  - Cyber Grand Challenge
+  - vulnerability analysis
+  - autonomous cyber reasoning
+  - CWE

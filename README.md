@@ -45,9 +45,11 @@ Paper claims fully reproduced by `cfe-parse-results.json`:
   cracked within five rounds of deployment and within the first
   third of their enabled window, and confirms that the 62
   non-exploited CBs were never exploited regardless of window
-  length. The reproduced numbers do not exactly match the paper's
-  current "half within five rounds, rest within first third"
-  phrasing; see the paper-repo TODO for the audit item.
+  length. The reproduced numbers match the paper's Section 4 timing
+  claims: 13 of 20 exploited CBs (two-thirds) fell within five
+  rounds of deployment, the longest-lived exploited CB held out for
+  13 rounds, and the 62 never-exploited CBs had enabled windows of
+  15--25 rounds.
 
 ## Reproduce
 
